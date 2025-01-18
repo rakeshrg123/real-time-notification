@@ -24,7 +24,7 @@ var server = http.createServer(app);
 // Add Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // Adjust to your frontend URL
+    origin: "https://real-time-notification-frontend.onrender.com", // Adjust to your frontend URL
     methods: ["GET", "POST"],
   },
 });
