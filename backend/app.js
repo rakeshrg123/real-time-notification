@@ -19,7 +19,7 @@ app.use(cors());
 
 
 const corsOptions = {
-  origin: "http://localhost:3000", 
+  origin: "https://real-time-notification-frontend.onrender.com", 
   methods: ["GET", "POST", "PUT", "DELETE"], 
   allowedHeaders: ["Content-Type", "Authorization"], 
 };
