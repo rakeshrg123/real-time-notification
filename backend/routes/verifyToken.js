@@ -1,9 +1,11 @@
 const jwt = require('jsonwebtoken'); // Ensure you are using JWT for authentication
 
 
-const verifyToken = (role = 'user') => {  
+const verifyToken = (role='user') => {  
     return (req, res, next) => {
         const token = req.headers.authorization?.split(' ')[1]; 
+        console.log(token);
+        
 
         if (!token) {
             return res.status(401).json({ error: 'Access denied. No token provided.' });
@@ -14,7 +16,7 @@ const verifyToken = (role = 'user') => {
             req.user = decoded;  
 
             
-            if (role === 'user' || (req.user && req.user.roles && req.user.roles.includes(role))) {
+            if (role === 'user' || (req.user && req.user.role && req.user.role.includes(role))) {
                 next();  // Proceed to the next middleware or route handler
             } else {
                 res.status(403).json({ error: 'Forbidden. Insufficient permissions.' });
