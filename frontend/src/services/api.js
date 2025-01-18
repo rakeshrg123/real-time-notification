@@ -1,7 +1,7 @@
 import axios from 'axios';
 import  store  from '../store/store'; 
 
-const API_URL = 'http://localhost:5000'; 
+const API_URL = 'https://real-time-notification-backend.onrender.com'; 
 
 // Create an axios instance
 const api = axios.create({
