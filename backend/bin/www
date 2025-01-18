@@ -1,0 +1,248 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+var app = require('../app');
+var debug = require('debug')('backend:server');
+var http = require('http');
+const { Server } = require('socket.io');
+const mongoose = require('mongoose');
+const User = require('../models/userModel');  
+
+/**
+ * Get port from environment and store in Express.
+ */
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+var server = http.createServer(app);
+
+// Add Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000", // Adjust to your frontend URL
+    methods: ["GET", "POST"],
+  },
+});
+
+let onlineUsers = new Map(); // Stores userId to socketId mapping
+
+// Handle WebSocket connections
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+
+  // Add user to onlineUsers when they log in
+  socket.on('addUser', (userId) => {
+    if (!onlineUsers.has(userId)) {
+      onlineUsers.set(userId, socket.id);
+      io.emit('getUsers', Array.from(onlineUsers.keys())); // Broadcast active users
+    }
+  });
+
+// Handle sending friend requests
+socket.on('sendFriendRequest', async ({ senderId, receiverId }) => {
+  try {
+    const receiver = await User.findById(receiverId);
+    if (!receiver) {
+      socket.emit('error', 'Receiver not found!');
+      return;
+    }
+
+    // Check if a friend request already exists
+    if (receiver.friendRequests.some(request => request.userId.toString() === senderId)) {
+      socket.emit('error', 'Friend request already sent');
+      return;
+    }
+
+    // Fetch sender's name
+    const sender = await User.findById(senderId);
+    if (!sender) {
+      socket.emit('error', 'Sender not found!');
+      return;
+    }
+
+    // Add sender to receiver's friendRequests with sender's name
+    receiver.friendRequests.push({ userId: senderId, name: sender.name });
+    await receiver.save();
+
+    // If receiver is online, notify them in real-time
+    const receiverSocket = onlineUsers.get(receiverId);
+    if (receiverSocket) {
+      io.to(receiverSocket).emit('receiveFriendRequest', {
+        senderId,
+        senderName: sender.name, // Send sender's name
+        message: 'You have a new friend request!',
+      });
+    }
+
+    socket.emit('success', 'Friend request sent successfully');
+  } catch (error) {
+    console.error(error);
+    socket.emit('error', 'Failed to send friend request');
+  }
+});
+
+// Handle accepting friend requests
+socket.on('acceptFriendRequest', async ({ senderId, receiverId }) => {
+  try {
+    const receiver = await User.findById(receiverId);
+    const sender = await User.findById(senderId);
+
+    if (!receiver || !sender) {
+      socket.emit('error', 'User not found');
+      return;
+    }
+
+    // Check if the sender is in receiver's friendRequests
+    const requestIndex = receiver.friendRequests.findIndex(request => request.userId.toString() === senderId);
+    if (requestIndex === -1) {
+      socket.emit('error', 'No friend request from this user');
+      return;
+    }
+
+    // Remove the sender from friendRequests and add to friends with the sender's name
+    const { name } = receiver.friendRequests[requestIndex];
+    receiver.friendRequests.pull(receiver.friendRequests[requestIndex]);
+    receiver.friends.push({ userId: senderId, name: sender.name });
+    sender.friends.push({ userId: receiverId, name: receiver.name });
+
+    // Save both user documents
+    await Promise.all([receiver.save(), sender.save()]);
+
+    // Notify both users about the acceptance
+    const receiverSocket = onlineUsers.get(receiverId);
+    if (receiverSocket) {
+      io.to(receiverSocket).emit('friendRequestAccepted', {
+        senderId: receiverId,
+        senderName: receiver.name,  // Send receiver's name as well
+        message: 'Your friend request has been accepted!',
+      });
+    }
+
+    const senderSocket = onlineUsers.get(senderId);
+    if (senderSocket) {
+      io.to(senderSocket).emit('friendRequestAccepted', {
+        senderId: receiverId,
+        senderName: sender.name,  // Send sender's name as well
+        message: 'You have accepted the friend request!',
+      });
+    }
+
+    socket.emit('success', 'Friend request accepted successfully');
+  } catch (error) {
+    console.error(error);
+    socket.emit('error', 'Failed to accept friend request');
+  }
+});
+
+// Handle rejecting friend requests
+socket.on('rejectFriendRequest', async ({ senderId, receiverId }) => {
+  try {
+    const receiver = await User.findById(receiverId);
+    if (!receiver) {
+      socket.emit('error', 'Receiver not found!');
+      return;
+    }
+
+    // Check if the sender is in receiver's friendRequests
+    const requestIndex = receiver.friendRequests.findIndex(request => request.userId.toString() === senderId);
+    if (requestIndex === -1) {
+      socket.emit('error', 'No friend request from this user');
+      return;
+    }
+
+    // Remove the sender from friendRequests
+    receiver.friendRequests.pull(receiver.friendRequests[requestIndex]);
+    await receiver.save();
+
+    // Notify the sender about the rejection
+    const senderSocket = onlineUsers.get(senderId);
+    if (senderSocket) {
+      io.to(senderSocket).emit('friendRequestRejected', {
+        receiverId,
+        message: 'Your friend request has been rejected!',
+      });
+    }
+
+    socket.emit('success', 'Friend request rejected successfully');
+  } catch (error) {
+    console.error(error);
+    socket.emit('error', 'Failed to reject friend request');
+  }
+});
+
+
+  // Remove user on disconnect
+  socket.on('disconnect', () => {
+    console.log('A user disconnected:', socket.id);
+    onlineUsers.forEach((socketId, userId) => {
+      if (socketId === socket.id) {
+        onlineUsers.delete(userId); // Remove user from the map
+        io.emit('getUsers', Array.from(onlineUsers.keys())); // Update active users list
+      }
+    });
+  });
+});
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+  if (isNaN(port)) {
+    return val;
+  }
+  if (port >= 0) {
+    return port;
+  }
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}

@@ -1,0 +1,28 @@
+.container {
+    max-width: 400px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .container .title {
+    font-size: 1.8rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 1rem;
+    color: #333;
+  }
+  
+  .container .info {
+    font-size: 1.1rem;
+    margin: 0.5rem 0;
+    color: #555;
+  }
+  
+  .container .info.highlight {
+    color: #0073e6;
+    font-weight: bold;
+  }
+  
