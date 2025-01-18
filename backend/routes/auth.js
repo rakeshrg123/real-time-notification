@@ -5,7 +5,7 @@ const User = require('../models/userModel');
 const verifyToken = require('./verifyToken');
 
 
-router.post('/add-user', verifyToken('admin'),(req, res) => {
+router.post('/add-user', verifyToken(['admin']),(req, res) => {
     const { name, email, password, confirmPassword } = req.body;
   
     // Check if the password and confirm password match
