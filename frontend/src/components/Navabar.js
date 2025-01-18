@@ -91,9 +91,6 @@ const Navbar = () => {
             anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
           >
-            <Link to="/profile" style={{ textDecoration: 'none', color: 'black' }}>
-              <MenuItem onClick={handleMenuClose}>My Profile</MenuItem>
-            </Link>
             <MenuItem onClick={handleLogout}>Logout</MenuItem>
           </Menu>
         </Box>
