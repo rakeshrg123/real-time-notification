@@ -17,7 +17,10 @@ const getToken = () => {
     return token;
   }
 
-export const registerUser = (userData) => api.post('authApi/add-user', userData);
+export const registerUser = (userData) =>{ 
+  const token = getToken();
+  api.post('authApi/add-user', userData,{ headers: { Authorization: `Bearer ${token}` } });
+}
 export const loginUser = (credentials) => api.post('authApi/login', credentials);
 export const getProfile = () => {
   const token = getToken();
